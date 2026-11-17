@@ -24,3 +24,24 @@ create policy "own clients" on public.clients
   for all to authenticated
   using (user_id = auth.uid())
   with check (user_id = auth.uid());
+
+-- История касаний (звонки, встречи, сообщения) по каждому клиенту
+create table if not exists public.touches (
+  id         uuid primary key default gen_random_uuid(),
+  user_id    uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  client_id  uuid not null references public.clients(id) on delete cascade,
+  date       date not null default current_date,
+  kind       text not null default 'call',
+  text       text default '',
+  created_at timestamptz not null default now()
+);
+
+create index if not exists touches_client_idx on public.touches(client_id, date desc);
+
+alter table public.touches enable row level security;
+
+drop policy if exists "own touches" on public.touches;
+create policy "own touches" on public.touches
+  for all to authenticated
+  using (user_id = auth.uid())
+  with check (user_id = auth.uid());
