@@ -116,6 +116,7 @@ label textarea{min-height:90px;resize:vertical}
     <label style="margin-top:10px">Пароль<input type="password" name="password" required minlength="6" autocomplete="current-password" placeholder="не меньше 6 символов"></label>
     <button class="btn primary" type="submit" style="width:100%;margin-top:12px" id="loginBtn">Войти</button>
     <button class="btn" type="button" style="width:100%;margin-top:8px" id="signupBtn">Создать аккаунт</button>
+    <button class="btn" type="button" style="width:100%;margin-top:8px;border:0;background:none;color:var(--accent)" id="forgotBtn">Забыли пароль / нет пароля?</button>
     <p class="sub" id="loginMsg" style="margin-top:12px"></p>
   </form>
 </div>
@@ -403,6 +404,23 @@ async function auth(mode){
 }
 $('#loginForm').addEventListener('submit',e=>{e.preventDefault();auth('in')});
 $('#signupBtn').onclick=()=>auth('up');
+$('#forgotBtn').onclick=async()=>{
+  const em=$('#loginForm').elements.email;
+  if(!em.value.trim()||!em.checkValidity()){em.focus();return $('#loginMsg').textContent='Сначала впишите email.'}
+  $('#loginMsg').textContent='Отправляем письмо…';
+  const {error}=await sb.auth.resetPasswordForEmail(em.value.trim(),{redirectTo:location.origin+location.pathname});
+  $('#loginMsg').textContent=error?(/rate limit/i.test(error.message)?'Лимит писем исчерпан (2 в час). Попробуйте позже.':'Ошибка: '+error.message):`Письмо отправлено на ${em.value.trim()}. Откройте его и нажмите ссылку — CRM попросит придумать пароль. Проверьте «Спам».`;
+};
+async function askNewPassword(){
+  for(;;){
+    const p=prompt('Придумайте пароль для входа (не меньше 6 символов):');
+    if(p==null)return;
+    if(p.length<6){alert('Пароль должен быть не короче 6 символов');continue}
+    const {error}=await sb.auth.updateUser({password:p});
+    if(error){alert(authMsg(error));continue}
+    return alert('Пароль сохранён. Теперь на любом устройстве входите с этим email и паролем.');
+  }
+}
 $('#pwBtn').onclick=async()=>{
   const p=prompt('Новый пароль для входа с других устройств (не меньше 6 символов):');
   if(p==null)return;
@@ -411,7 +429,7 @@ $('#pwBtn').onclick=async()=>{
   error?alert(authMsg(error)):alert('Пароль сохранён. Теперь на другом устройстве войдите с email '+session.user.email+' и этим паролем.');
 };
 $('#logoutBtn').onclick=async()=>{if(confirm('Выйти из CRM на этом устройстве?')){await sb.auth.signOut();db.clients=[];showApp(null)}};
-sb.auth.onAuthStateChange((ev,s)=>{if(ev==='SIGNED_IN'&&(!session||session.user.id!==s.user.id))showApp(s);if(ev==='SIGNED_OUT')showApp(null)});
+sb.auth.onAuthStateChange((ev,s)=>{if(ev==='PASSWORD_RECOVERY'){showApp(s);setTimeout(askNewPassword,600);return}if(ev==='SIGNED_IN'&&(!session||session.user.id!==s.user.id))showApp(s);if(ev==='SIGNED_OUT')showApp(null)});
 sb.auth.getSession().then(({data})=>{if(!session)showApp(data.session)});
 // подтягиваем изменения с другого устройства
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&session&&!$('#dlg').open)fetchAll()});
