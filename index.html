@@ -90,6 +90,12 @@ label textarea{min-height:90px;resize:vertical}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--text);color:var(--bg);padding:10px 16px;border-radius:10px;font-size:14px;opacity:0;transition:opacity .2s;pointer-events:none}
 .toast.show{opacity:1}
 .cards-m{display:none}
+.login{min-height:100vh;display:grid;place-items:center;padding:16px}
+.loginbox{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:28px;width:min(380px,100%);box-shadow:var(--shadow)}
+.loginbox h1{margin:0 0 6px;font-size:22px}
+.sync{font-size:13px;color:var(--muted)}
+.sync.err{color:var(--danger)}
+[hidden]{display:none!important}
 @media (max-width:760px){
   .kpis{grid-template-columns:1fr 1fr}
   .kpi .v{font-size:20px}
@@ -102,10 +108,21 @@ label textarea{min-height:90px;resize:vertical}
 </style>
 </head>
 <body>
-<div class="wrap">
+<div class="login" id="login" hidden>
+  <form id="loginForm" class="loginbox">
+    <h1>Мини CRM</h1>
+    <p class="sub" id="loginHint">Введите email — пришлём ссылку для входа. Пароль не нужен.</p>
+    <label>Email<input type="email" name="email" required autocomplete="email" placeholder="you@example.com"></label>
+    <button class="btn primary" type="submit" style="width:100%;margin-top:12px" id="loginBtn">Получить ссылку</button>
+    <p class="sub" id="loginMsg" style="margin-top:12px"></p>
+  </form>
+</div>
+<div class="wrap" id="app" hidden>
   <header>
     <h1 id="title">Мини CRM</h1>
+    <span class="sync" id="sync"></span>
     <button class="btn icon" id="themeBtn" title="Тема">◐</button>
+    <button class="btn" id="logoutBtn" title="Выйти">Выйти</button>
     <button class="btn primary" id="addBtn">+ Клиент</button>
   </header>
 
@@ -123,7 +140,7 @@ label textarea{min-height:90px;resize:vertical}
   <div id="view"></div>
 
   <div class="foot">
-    <span>Данные хранятся в этом браузере.</span>
+    <span id="who"></span>
     <button class="btn" id="expCsv">Экспорт CSV</button>
     <button class="btn" id="expJson">Резервная копия</button>
     <button class="btn" id="impJson">Восстановить из копии</button>
@@ -156,7 +173,11 @@ label textarea{min-height:90px;resize:vertical}
 <datalist id="srcList"></datalist>
 <div class="toast" id="toast"></div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.min.js"></script>
 <script>
+// ── Настройки базы (Supabase → Project Settings → API) ──
+const SUPABASE_URL='https://gvntcfspniqsbjodnqjh.supabase.co';
+const SUPABASE_KEY='sb_publishable_7J8k8bhFAVVRnjJiQ1i3MQ_IJJA6WO8'; // публичный ключ, безопасен в браузере
 const KEY='mini-crm-v1';
 const STATUSES=[
   {id:'new',  name:'Новый',      c:'--s-new'},
@@ -173,10 +194,28 @@ const money=n=>new Intl.NumberFormat('ru-RU',{maximumFractionDigits:0}).format(n
 const today=()=>new Date().toISOString().slice(0,10);
 const fmtDate=d=>d?new Date(d+'T00:00').toLocaleDateString('ru-RU',{day:'numeric',month:'short'}):'';
 
-let mem=null;
-function load(){try{const r=localStorage.getItem(KEY);if(r)return JSON.parse(r)}catch(e){}return mem||{clients:[]}}
-function save(){mem=db;try{localStorage.setItem(KEY,JSON.stringify(db))}catch(e){}}
-let db=load();
+const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+let db={clients:[]};
+const fromRow=r=>({id:r.id,name:r.name,phone:r.phone||'',contact:r.contact||'',status:r.status,amount:+r.amount||0,source:r.source||'',next:r.next_contact||'',note:r.note||'',created:r.created_at,updated:r.updated_at});
+const toRow=c=>({name:c.name,phone:c.phone||'',contact:c.contact||'',status:c.status||'new',amount:+c.amount||0,source:c.source||'',next_contact:c.next||null,note:c.note||''});
+function syncState(t,err){const el=$('#sync');el.textContent=t;el.classList.toggle('err',!!err)}
+function fail(e){console.error(e);syncState('Нет связи с базой',1);toast('Ошибка: '+(e.message||e))}
+async function fetchAll(){
+  syncState('Загрузка…');
+  const {data,error}=await sb.from('clients').select('*').order('updated_at',{ascending:false});
+  if(error)return fail(error);
+  db.clients=data.map(fromRow);syncState('');render();
+}
+async function upsertClient(id,data){
+  syncState('Сохранение…');
+  const row={...toRow(data),updated_at:new Date().toISOString()};
+  const q=id?sb.from('clients').update(row).eq('id',id).select().single():sb.from('clients').insert(row).select().single();
+  const {data:r,error}=await q;
+  if(error){fail(error);return false}
+  const c=fromRow(r),i=db.clients.findIndex(x=>x.id===c.id);
+  if(i>=0)db.clients[i]=c;else db.clients.unshift(c);
+  syncState('');render();return true;
+}
 let ui={q:'',status:'',view:'table',sort:'updated',dir:-1,editing:null};
 try{Object.assign(ui,JSON.parse(localStorage.getItem(KEY+'-ui')||'{}'),{q:'',editing:null})}catch(e){}
 const saveUi=()=>{try{localStorage.setItem(KEY+'-ui',JSON.stringify({view:ui.view,sort:ui.sort,dir:ui.dir,status:ui.status}))}catch(e){}};
@@ -266,18 +305,21 @@ function openDlg(id){
 }
 window.openDlg=openDlg;
 
-$('#frm').addEventListener('submit',e=>{
+$('#frm').addEventListener('submit',async e=>{
+  e.preventDefault();
   const f=e.target,v=k=>f.elements[k].value.trim();
   const data={name:v('name'),phone:v('phone'),contact:v('contact'),status:v('status'),amount:parseFloat(v('amount').replace(/\s/g,'').replace(',','.'))||0,source:v('source'),next:v('next'),note:f.elements.note.value.trim()};
-  const now=new Date().toISOString();
-  if(ui.editing){Object.assign(db.clients.find(x=>x.id===ui.editing),data,{updated:now})}
-  else db.clients.push({id:Date.now().toString(36)+Math.random().toString(36).slice(2,6),...data,created:now,updated:now});
-  save();render();toast('Сохранено');
+  const btn=f.querySelector('[type=submit]');btn.disabled=true;
+  const ok=await upsertClient(ui.editing,data);btn.disabled=false;
+  if(ok){$('#dlg').close();toast('Сохранено')}
 });
 $('#cancelBtn').onclick=()=>$('#dlg').close();
-$('#delBtn').onclick=()=>{
+$('#delBtn').onclick=async()=>{
   const c=db.clients.find(x=>x.id===ui.editing);
-  if(c&&confirm(`Удалить «${c.name}»?`)){db.clients=db.clients.filter(x=>x!==c);save();$('#dlg').close();render();toast('Удалено')}
+  if(!c||!confirm(`Удалить «${c.name}»?`))return;
+  const {error}=await sb.from('clients').delete().eq('id',c.id);
+  if(error)return fail(error);
+  db.clients=db.clients.filter(x=>x!==c);$('#dlg').close();render();toast('Удалено');
 };
 
 $('#addBtn').onclick=()=>openDlg();
@@ -294,7 +336,7 @@ let dragId=null;
 $('#view').addEventListener('dragstart',e=>{const c=e.target.closest('.card');if(c){dragId=c.dataset.id;e.dataTransfer.effectAllowed='move'}});
 $('#view').addEventListener('dragover',e=>{const col=e.target.closest('.col');if(col&&dragId){e.preventDefault();document.querySelectorAll('.col').forEach(x=>x.classList.toggle('drop',x===col))}});
 $('#view').addEventListener('dragleave',e=>{if(!e.relatedTarget||!e.relatedTarget.closest||!e.relatedTarget.closest('.col'))document.querySelectorAll('.col').forEach(x=>x.classList.remove('drop'))});
-$('#view').addEventListener('drop',e=>{const col=e.target.closest('.col');if(col&&dragId){e.preventDefault();const c=db.clients.find(x=>x.id===dragId);if(c&&c.status!==col.dataset.st){c.status=col.dataset.st;c.updated=new Date().toISOString();save();toast(`→ ${ST[c.status].name}`)}dragId=null;render()}});
+$('#view').addEventListener('drop',e=>{const col=e.target.closest('.col');if(col&&dragId){e.preventDefault();const c=db.clients.find(x=>x.id===dragId);const st=col.dataset.st;dragId=null;if(c&&c.status!==st){upsertClient(c.id,{...c,status:st}).then(ok=>ok&&toast(`→ ${ST[st].name}`))}else render()}});
 $('#view').addEventListener('dragend',()=>{dragId=null;document.querySelectorAll('.col').forEach(x=>x.classList.remove('drop'))});
 
 // export / import
@@ -309,11 +351,17 @@ $('#expJson').onclick=()=>download(`crm-backup-${today()}.json`,JSON.stringify(d
 $('#impJson').onclick=()=>$('#impFile').click();
 $('#impFile').onchange=async e=>{
   const file=e.target.files[0];if(!file)return;
-  try{const d=JSON.parse(await file.text());if(!Array.isArray(d.clients))throw 0;
-    if(confirm(`Заменить текущие данные (${db.clients.length}) на копию (${d.clients.length} клиентов)?`)){db=d;save();render();toast('Восстановлено')}}
-  catch(_){alert('Не удалось прочитать файл резервной копии')}
+  let d;try{d=JSON.parse(await file.text());if(!Array.isArray(d.clients))throw 0}catch(_){e.target.value='';return alert('Не удалось прочитать файл резервной копии')}
   e.target.value='';
+  if(confirm(`Добавить в базу ${d.clients.length} клиентов из копии?`))importClients(d.clients);
 };
+async function importClients(list){
+  syncState('Загрузка в базу…');
+  const rows=list.map(c=>({...toRow(c),...(c.created?{created_at:c.created}:{}),...(c.updated?{updated_at:c.updated}:{})}));
+  const {error}=await sb.from('clients').insert(rows);
+  if(error)return fail(error);
+  toast(`Добавлено: ${rows.length}`);await fetchAll();return true;
+}
 
 // theme
 function applyTheme(t){if(t)document.documentElement.dataset.theme=t;else delete document.documentElement.dataset.theme}
@@ -323,8 +371,34 @@ $('#themeBtn').onclick=()=>{const dark=matchMedia('(prefers-color-scheme: dark)'
 // init selects
 const opts=STATUSES.map(s=>`<option value="${s.id}">${s.name}</option>`).join('');
 $('#stSel').innerHTML=opts;$('#fStatus').innerHTML+=opts;
-window.addEventListener('storage',e=>{if(e.key===KEY){db=load();render()}});
-render();
+// ── вход и синхронизация ──
+let session=null;
+async function showApp(s){
+  session=s;
+  $('#login').hidden=!!s;$('#app').hidden=!s;
+  if(!s)return;
+  $('#who').textContent='Вход: '+s.user.email;
+  await fetchAll();
+  // перенос старых данных из браузера (версия без базы)
+  let local=null;try{local=JSON.parse(localStorage.getItem(KEY)||'null')}catch(e){}
+  if(local&&local.clients&&local.clients.length&&confirm(`В этом браузере есть ${local.clients.length} клиентов из старой версии. Перенести их в базу?`)){
+    if(await importClients(local.clients))try{localStorage.removeItem(KEY)}catch(e){}
+  }
+}
+$('#loginForm').addEventListener('submit',async e=>{
+  e.preventDefault();
+  const email=e.target.elements.email.value.trim(),btn=$('#loginBtn');
+  btn.disabled=true;$('#loginMsg').textContent='Отправляем…';
+  const {error}=await sb.auth.signInWithOtp({email,options:{emailRedirectTo:location.origin+location.pathname}});
+  btn.disabled=false;
+  $('#loginMsg').textContent=error?'Ошибка: '+error.message:`Готово! Откройте письмо на ${email} и нажмите ссылку. Письмо может попасть в «Спам».`;
+});
+$('#logoutBtn').onclick=async()=>{if(confirm('Выйти из CRM на этом устройстве?')){await sb.auth.signOut();db.clients=[];showApp(null)}};
+sb.auth.onAuthStateChange((ev,s)=>{if(ev==='SIGNED_IN'&&(!session||session.user.id!==s.user.id))showApp(s);if(ev==='SIGNED_OUT')showApp(null)});
+sb.auth.getSession().then(({data})=>{if(!session)showApp(data.session)});
+// подтягиваем изменения с другого устройства
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&session&&!$('#dlg').open)fetchAll()});
+setInterval(()=>{if(!document.hidden&&session&&!$('#dlg').open)fetchAll()},60000);
 </script>
 </body>
 </html>
