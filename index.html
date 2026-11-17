@@ -111,9 +111,11 @@ label textarea{min-height:90px;resize:vertical}
 <div class="login" id="login" hidden>
   <form id="loginForm" class="loginbox">
     <h1>Мини CRM</h1>
-    <p class="sub" id="loginHint">Введите email — пришлём ссылку для входа. Пароль не нужен.</p>
+    <p class="sub" id="loginHint">Войдите, чтобы открыть своих клиентов.</p>
     <label>Email<input type="email" name="email" required autocomplete="email" placeholder="you@example.com"></label>
-    <button class="btn primary" type="submit" style="width:100%;margin-top:12px" id="loginBtn">Получить ссылку</button>
+    <label style="margin-top:10px">Пароль<input type="password" name="password" required minlength="6" autocomplete="current-password" placeholder="не меньше 6 символов"></label>
+    <button class="btn primary" type="submit" style="width:100%;margin-top:12px" id="loginBtn">Войти</button>
+    <button class="btn" type="button" style="width:100%;margin-top:8px" id="signupBtn">Создать аккаунт</button>
     <p class="sub" id="loginMsg" style="margin-top:12px"></p>
   </form>
 </div>
@@ -144,6 +146,7 @@ label textarea{min-height:90px;resize:vertical}
     <button class="btn" id="expCsv">Экспорт CSV</button>
     <button class="btn" id="expJson">Резервная копия</button>
     <button class="btn" id="impJson">Восстановить из копии</button>
+    <button class="btn" id="pwBtn">Задать пароль</button>
     <input type="file" id="impFile" accept=".json,application/json" hidden>
   </div>
 </div>
@@ -385,14 +388,28 @@ async function showApp(s){
     if(await importClients(local.clients))try{localStorage.removeItem(KEY)}catch(e){}
   }
 }
-$('#loginForm').addEventListener('submit',async e=>{
-  e.preventDefault();
-  const email=e.target.elements.email.value.trim(),btn=$('#loginBtn');
-  btn.disabled=true;$('#loginMsg').textContent='Отправляем…';
-  const {error}=await sb.auth.signInWithOtp({email,options:{emailRedirectTo:location.origin+location.pathname}});
-  btn.disabled=false;
-  $('#loginMsg').textContent=error?'Ошибка: '+error.message:`Готово! Откройте письмо на ${email} и нажмите ссылку. Письмо может попасть в «Спам».`;
-});
+const AUTH_ERR={'Invalid login credentials':'Неверный email или пароль. Если вы раньше входили по ссылке из письма — откройте CRM на том устройстве, где уже вошли, и нажмите внизу «Задать пароль».','User already registered':'Такой email уже зарегистрирован — нажмите «Войти».','Password should be at least 6 characters.':'Пароль должен быть не короче 6 символов.'};
+const authMsg=err=>AUTH_ERR[err.message]||('Ошибка: '+err.message);
+async function auth(mode){
+  const f=$('#loginForm');
+  if(!f.reportValidity())return;
+  const email=f.elements.email.value.trim(),password=f.elements.password.value;
+  $('#loginBtn').disabled=$('#signupBtn').disabled=true;$('#loginMsg').textContent='Подождите…';
+  const {data,error}=mode==='up'?await sb.auth.signUp({email,password}):await sb.auth.signInWithPassword({email,password});
+  $('#loginBtn').disabled=$('#signupBtn').disabled=false;
+  if(error)return $('#loginMsg').textContent=authMsg(error);
+  if(mode==='up'&&!data.session)return $('#loginMsg').textContent='Аккаунт создан, но вход пока недоступен. Попробуйте «Войти».';
+  $('#loginMsg').textContent='';
+}
+$('#loginForm').addEventListener('submit',e=>{e.preventDefault();auth('in')});
+$('#signupBtn').onclick=()=>auth('up');
+$('#pwBtn').onclick=async()=>{
+  const p=prompt('Новый пароль для входа с других устройств (не меньше 6 символов):');
+  if(p==null)return;
+  if(p.length<6)return alert('Пароль должен быть не короче 6 символов');
+  const {error}=await sb.auth.updateUser({password:p});
+  error?alert(authMsg(error)):alert('Пароль сохранён. Теперь на другом устройстве войдите с email '+session.user.email+' и этим паролем.');
+};
 $('#logoutBtn').onclick=async()=>{if(confirm('Выйти из CRM на этом устройстве?')){await sb.auth.signOut();db.clients=[];showApp(null)}};
 sb.auth.onAuthStateChange((ev,s)=>{if(ev==='SIGNED_IN'&&(!session||session.user.id!==s.user.id))showApp(s);if(ev==='SIGNED_OUT')showApp(null)});
 sb.auth.getSession().then(({data})=>{if(!session)showApp(data.session)});
