@@ -1,0 +1,330 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Мини CRM</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%232f6f5e'/><path d='M9 20l5-5 4 4 6-7' stroke='white' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>">
+<style>
+:root{
+  --bg:#f6f5f2;--surface:#fff;--surface2:#f0eee9;--text:#1d1c1a;--muted:#6b6862;--line:#e3e0d9;
+  --accent:#2f6f5e;--accent-ink:#fff;--danger:#b4412f;--warn:#a86a10;
+  --s-new:#5a6f8f;--s-work:#2d7fb8;--s-talk:#8a5cb8;--s-deal:#a86a10;--s-paid:#2f8a52;--s-lost:#9a948a;
+  --shadow:0 1px 2px rgba(0,0,0,.05),0 4px 16px rgba(0,0,0,.05);
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#151513;--surface:#1e1e1b;--surface2:#272723;--text:#ecebe7;--muted:#9c9890;--line:#33322e;
+  --accent:#5fb39b;--accent-ink:#0f1f1a;--danger:#e2735f;--warn:#e0a54a;
+  --s-new:#8ea3c4;--s-work:#5eaee6;--s-talk:#b993e3;--s-deal:#e0a54a;--s-paid:#62c387;--s-lost:#7d786f;
+  --shadow:0 1px 2px rgba(0,0,0,.4);
+}}
+:root[data-theme="dark"]{
+  --bg:#151513;--surface:#1e1e1b;--surface2:#272723;--text:#ecebe7;--muted:#9c9890;--line:#33322e;
+  --accent:#5fb39b;--accent-ink:#0f1f1a;--danger:#e2735f;--warn:#e0a54a;
+  --s-new:#8ea3c4;--s-work:#5eaee6;--s-talk:#b993e3;--s-deal:#e0a54a;--s-paid:#62c387;--s-lost:#7d786f;
+  --shadow:0 1px 2px rgba(0,0,0,.4);
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Inter,sans-serif}
+button,input,select,textarea{font:inherit;color:inherit}
+.wrap{max-width:1200px;margin:0 auto;padding:20px 16px 60px}
+header{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:18px}
+header h1{font-size:22px;margin:0;font-weight:650;letter-spacing:-.01em;flex:1;min-width:160px}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:8px 14px;cursor:pointer;white-space:nowrap}
+.btn:hover{background:var(--surface2)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+.btn.primary:hover{filter:brightness(1.07)}
+.btn.danger{color:var(--danger)}
+.btn.icon{padding:8px 10px}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px;box-shadow:var(--shadow)}
+.kpi .l{color:var(--muted);font-size:13px}
+.kpi .v{font-size:24px;font-weight:650;margin-top:2px;font-variant-numeric:tabular-nums}
+.kpi .s{color:var(--muted);font-size:12px}
+.toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+.toolbar input[type=search]{flex:1;min-width:180px;padding:9px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+.toolbar select{padding:9px 10px;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--surface)}
+.seg button{border:0;background:none;padding:8px 12px;cursor:pointer}
+.seg button.on{background:var(--surface2);font-weight:600}
+.table{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden;box-shadow:var(--shadow)}
+table{width:100%;border-collapse:collapse}
+th,td{text-align:left;padding:11px 14px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;cursor:pointer;user-select:none;white-space:nowrap}
+th .ar{opacity:.6}
+tbody tr{cursor:pointer}
+tbody tr:hover{background:var(--surface2)}
+tbody tr:last-child td{border-bottom:0}
+td.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+th.num{text-align:right}
+.name{font-weight:600}
+.sub{color:var(--muted);font-size:13px}
+.note{color:var(--muted);font-size:13px;max-width:280px;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:13px;padding:3px 10px;border-radius:999px;background:var(--surface2);white-space:nowrap}
+.pill i{width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block}
+.due{white-space:nowrap}
+.due.over{color:var(--danger);font-weight:600}
+.due.today{color:var(--warn);font-weight:600}
+.empty{padding:48px 16px;text-align:center;color:var(--muted)}
+.board{display:grid;grid-template-columns:repeat(6,minmax(200px,1fr));gap:12px;overflow-x:auto;padding-bottom:8px}
+.col{background:var(--surface2);border-radius:14px;padding:10px;min-height:120px}
+.col.drop{outline:2px dashed var(--accent);outline-offset:-2px}
+.col h3{font-size:13px;margin:2px 4px 10px;display:flex;justify-content:space-between;gap:6px}
+.col h3 span.sum{color:var(--muted);font-weight:500;font-variant-numeric:tabular-nums;white-space:nowrap}
+.col h3>span:first-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:8px;cursor:grab;box-shadow:var(--shadow)}
+.card .amt{font-variant-numeric:tabular-nums;font-weight:600;font-size:14px;margin-top:4px}
+dialog{border:1px solid var(--line);border-radius:16px;padding:0;background:var(--surface);color:var(--text);width:min(560px,calc(100vw - 32px));box-shadow:0 20px 60px rgba(0,0,0,.25)}
+dialog::backdrop{background:rgba(0,0,0,.35)}
+dialog form{padding:20px}
+dialog h2{margin:0 0 16px;font-size:18px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.grid .full{grid-column:1/-1}
+label{display:block;font-size:13px;color:var(--muted)}
+label input,label select,label textarea{display:block;width:100%;margin-top:4px;padding:9px 11px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--text)}
+label textarea{min-height:90px;resize:vertical}
+.actions{display:flex;gap:8px;justify-content:flex-end;margin-top:18px;flex-wrap:wrap}
+.actions .sp{flex:1}
+.meta{font-size:12px;color:var(--muted);margin-top:10px}
+.foot{margin-top:22px;color:var(--muted);font-size:13px;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--text);color:var(--bg);padding:10px 16px;border-radius:10px;font-size:14px;opacity:0;transition:opacity .2s;pointer-events:none}
+.toast.show{opacity:1}
+.cards-m{display:none}
+@media (max-width:760px){
+  .kpis{grid-template-columns:1fr 1fr}
+  .kpi .v{font-size:20px}
+  .table table{display:none}
+  .cards-m{display:block}
+  .cards-m .card{cursor:pointer;margin:0;border:0;border-bottom:1px solid var(--line);border-radius:0;box-shadow:none}
+  .grid{grid-template-columns:1fr}
+  .board{grid-template-columns:repeat(6,78vw)}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1 id="title">Мини CRM</h1>
+    <button class="btn icon" id="themeBtn" title="Тема">◐</button>
+    <button class="btn primary" id="addBtn">+ Клиент</button>
+  </header>
+
+  <section class="kpis" id="kpis"></section>
+
+  <div class="toolbar">
+    <input type="search" id="q" placeholder="Поиск по имени, контакту, примечанию…">
+    <select id="fStatus"><option value="">Все статусы</option></select>
+    <div class="seg" id="viewSeg">
+      <button data-v="table" class="on">Список</button>
+      <button data-v="board">Воронка</button>
+    </div>
+  </div>
+
+  <div id="view"></div>
+
+  <div class="foot">
+    <span>Данные хранятся в этом браузере.</span>
+    <button class="btn" id="expCsv">Экспорт CSV</button>
+    <button class="btn" id="expJson">Резервная копия</button>
+    <button class="btn" id="impJson">Восстановить из копии</button>
+    <input type="file" id="impFile" accept=".json,application/json" hidden>
+  </div>
+</div>
+
+<dialog id="dlg">
+  <form method="dialog" id="frm">
+    <h2 id="dlgTitle">Новый клиент</h2>
+    <div class="grid">
+      <label class="full">Имя / компания *<input name="name" required autocomplete="off"></label>
+      <label>Телефон<input name="phone" type="tel" autocomplete="off"></label>
+      <label>Email / Telegram<input name="contact" autocomplete="off"></label>
+      <label>Статус<select name="status" id="stSel"></select></label>
+      <label>Сумма договора, ₽<input name="amount" inputmode="decimal" autocomplete="off" placeholder="0"></label>
+      <label>Источник<input name="source" list="srcList" autocomplete="off" placeholder="Рекомендация, Instagram…"></label>
+      <label>Следующий контакт<input name="next" type="date"></label>
+      <label class="full">Примечание<textarea name="note"></textarea></label>
+    </div>
+    <div class="meta" id="meta"></div>
+    <div class="actions">
+      <button type="button" class="btn danger" id="delBtn">Удалить</button>
+      <span class="sp"></span>
+      <button type="button" class="btn" id="cancelBtn">Отмена</button>
+      <button type="submit" class="btn primary">Сохранить</button>
+    </div>
+  </form>
+</dialog>
+<datalist id="srcList"></datalist>
+<div class="toast" id="toast"></div>
+
+<script>
+const KEY='mini-crm-v1';
+const STATUSES=[
+  {id:'new',  name:'Новый',      c:'--s-new'},
+  {id:'work', name:'В работе',   c:'--s-work'},
+  {id:'talk', name:'Переговоры', c:'--s-talk'},
+  {id:'deal', name:'Договор',    c:'--s-deal'},
+  {id:'paid', name:'Оплачено',   c:'--s-paid'},
+  {id:'lost', name:'Отказ',      c:'--s-lost'},
+];
+const ST=Object.fromEntries(STATUSES.map(s=>[s.id,s]));
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const money=n=>new Intl.NumberFormat('ru-RU',{maximumFractionDigits:0}).format(n||0)+' ₽';
+const today=()=>new Date().toISOString().slice(0,10);
+const fmtDate=d=>d?new Date(d+'T00:00').toLocaleDateString('ru-RU',{day:'numeric',month:'short'}):'';
+
+let mem=null;
+function load(){try{const r=localStorage.getItem(KEY);if(r)return JSON.parse(r)}catch(e){}return mem||{clients:[]}}
+function save(){mem=db;try{localStorage.setItem(KEY,JSON.stringify(db))}catch(e){}}
+let db=load();
+let ui={q:'',status:'',view:'table',sort:'updated',dir:-1,editing:null};
+try{Object.assign(ui,JSON.parse(localStorage.getItem(KEY+'-ui')||'{}'),{q:'',editing:null})}catch(e){}
+const saveUi=()=>{try{localStorage.setItem(KEY+'-ui',JSON.stringify({view:ui.view,sort:ui.sort,dir:ui.dir,status:ui.status}))}catch(e){}};
+
+function toast(t){const el=$('#toast');el.textContent=t;el.classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(()=>el.classList.remove('show'),1800)}
+function pill(id){const s=ST[id]||ST.new;return `<span class="pill" style="color:var(${s.c})"><i></i><span style="color:var(--text)">${s.name}</span></span>`}
+function dueCls(d){if(!d)return'';const t=today();return d<t?'over':d===t?'today':''}
+
+function filtered(){
+  const q=ui.q.trim().toLowerCase();
+  let list=db.clients.filter(c=>(!ui.status||c.status===ui.status)&&(!q||[c.name,c.phone,c.contact,c.note,c.source].join(' ').toLowerCase().includes(q)));
+  const k=ui.sort,d=ui.dir;
+  list.sort((a,b)=>{
+    let x=a[k],y=b[k];
+    if(k==='amount'){x=+x||0;y=+y||0}
+    else if(k==='status'){x=STATUSES.findIndex(s=>s.id===x);y=STATUSES.findIndex(s=>s.id===y)}
+    else if(k==='next'){x=x||'9999';y=y||'9999'}
+    else{x=String(x||'').toLowerCase();y=String(y||'').toLowerCase()}
+    return x<y?-d:x>y?d:0;
+  });
+  return list;
+}
+
+function renderKpis(){
+  const cs=db.clients,sum=f=>cs.filter(f).reduce((a,c)=>a+(+c.amount||0),0);
+  const active=c=>['new','work','talk','deal'].includes(c.status);
+  const paid=cs.filter(c=>c.status==='paid').length,lost=cs.filter(c=>c.status==='lost').length;
+  const conv=paid+lost?Math.round(paid/(paid+lost)*100):0;
+  const over=cs.filter(c=>active(c)&&c.next&&c.next<=today()).length;
+  $('#kpis').innerHTML=`
+    <div class="kpi"><div class="l">Клиентов в работе</div><div class="v">${cs.filter(active).length}</div><div class="s">всего ${cs.length}</div></div>
+    <div class="kpi"><div class="l">Сумма в воронке</div><div class="v">${money(sum(active))}</div><div class="s">договор: ${money(sum(c=>c.status==='deal'))}</div></div>
+    <div class="kpi"><div class="l">Оплачено</div><div class="v">${money(sum(c=>c.status==='paid'))}</div><div class="s">сделок: ${paid} · конверсия ${conv}%</div></div>
+    <div class="kpi"><div class="l">Связаться сегодня</div><div class="v" style="${over?'color:var(--danger)':''}">${over}</div><div class="s">включая просроченные</div></div>`;
+}
+
+function renderTable(){
+  const list=filtered();
+  if(!db.clients.length)return `<div class="table"><div class="empty">Пока нет клиентов.<br><br><button class="btn primary" onclick="openDlg()">+ Добавить первого</button></div></div>`;
+  if(!list.length)return `<div class="table"><div class="empty">Ничего не найдено</div></div>`;
+  const cols=[['name','Клиент'],['status','Статус'],['amount','Сумма',1],['next','След. контакт'],['note','Примечание']];
+  const head=cols.map(([k,t,n])=>`<th data-k="${k}" class="${n?'num':''}">${t} <span class="ar">${ui.sort===k?(ui.dir>0?'↑':'↓'):''}</span></th>`).join('');
+  const rows=list.map(c=>`<tr data-id="${c.id}">
+    <td><div class="name">${esc(c.name)}</div><div class="sub">${esc([c.phone,c.contact].filter(Boolean).join(' · '))}</div></td>
+    <td>${pill(c.status)}${c.source?`<div class="sub" style="margin-top:4px">${esc(c.source)}</div>`:''}</td>
+    <td class="num">${c.amount?money(c.amount):'—'}</td>
+    <td><span class="due ${dueCls(c.next)}">${fmtDate(c.next)||'—'}</span></td>
+    <td><div class="note">${esc(c.note)}</div></td></tr>`).join('');
+  const cards=list.map(c=>`<div class="card" data-id="${c.id}">
+    <div style="display:flex;justify-content:space-between;gap:8px"><div class="name">${esc(c.name)}</div>${pill(c.status)}</div>
+    <div class="sub">${esc([c.phone,c.contact].filter(Boolean).join(' · '))}</div>
+    <div style="display:flex;justify-content:space-between;margin-top:4px"><span class="amt">${c.amount?money(c.amount):''}</span><span class="due sub ${dueCls(c.next)}">${c.next?'→ '+fmtDate(c.next):''}</span></div>
+    ${c.note?`<div class="note" style="margin-top:4px">${esc(c.note)}</div>`:''}</div>`).join('');
+  return `<div class="table"><table><thead><tr>${head}</tr></thead><tbody>${rows}</tbody></table><div class="cards-m">${cards}</div></div>`;
+}
+
+function renderBoard(){
+  const list=filtered();
+  return `<div class="board">${STATUSES.map(s=>{
+    const items=list.filter(c=>c.status===s.id),sum=items.reduce((a,c)=>a+(+c.amount||0),0);
+    return `<div class="col" data-st="${s.id}"><h3><span style="color:var(${s.c})">● <span style="color:var(--text)">${s.name}</span> <span class="sum">${items.length}</span></span><span class="sum">${sum?money(sum):''}</span></h3>
+    ${items.map(c=>`<div class="card" draggable="true" data-id="${c.id}"><div class="name">${esc(c.name)}</div>
+      <div class="sub">${esc(c.phone||c.contact||'')}</div>
+      ${c.amount?`<div class="amt">${money(c.amount)}</div>`:''}
+      ${c.next?`<div class="sub due ${dueCls(c.next)}">→ ${fmtDate(c.next)}</div>`:''}</div>`).join('')}</div>`}).join('')}</div>`;
+}
+
+function render(){
+  renderKpis();
+  $('#view').innerHTML=ui.view==='board'?renderBoard():renderTable();
+  document.querySelectorAll('#viewSeg button').forEach(b=>b.classList.toggle('on',b.dataset.v===ui.view));
+  $('#fStatus').value=ui.status;
+  const srcs=[...new Set(db.clients.map(c=>c.source).filter(Boolean))];
+  $('#srcList').innerHTML=srcs.map(s=>`<option value="${esc(s)}">`).join('');
+}
+
+function openDlg(id){
+  const f=$('#frm');f.reset();ui.editing=id||null;
+  const c=id?db.clients.find(x=>x.id===id):null;
+  $('#dlgTitle').textContent=c?'Карточка клиента':'Новый клиент';
+  $('#delBtn').style.display=c?'':'none';
+  if(c){for(const k of ['name','phone','contact','status','amount','source','next','note'])f.elements[k].value=c[k]??''}
+  else f.elements.status.value='new';
+  $('#meta').textContent=c?`Создан ${new Date(c.created).toLocaleDateString('ru-RU')} · изменён ${new Date(c.updated).toLocaleString('ru-RU',{dateStyle:'short',timeStyle:'short'})}`:'';
+  $('#dlg').showModal();
+  if(!c)setTimeout(()=>f.elements.name.focus(),30);
+}
+window.openDlg=openDlg;
+
+$('#frm').addEventListener('submit',e=>{
+  const f=e.target,v=k=>f.elements[k].value.trim();
+  const data={name:v('name'),phone:v('phone'),contact:v('contact'),status:v('status'),amount:parseFloat(v('amount').replace(/\s/g,'').replace(',','.'))||0,source:v('source'),next:v('next'),note:f.elements.note.value.trim()};
+  const now=new Date().toISOString();
+  if(ui.editing){Object.assign(db.clients.find(x=>x.id===ui.editing),data,{updated:now})}
+  else db.clients.push({id:Date.now().toString(36)+Math.random().toString(36).slice(2,6),...data,created:now,updated:now});
+  save();render();toast('Сохранено');
+});
+$('#cancelBtn').onclick=()=>$('#dlg').close();
+$('#delBtn').onclick=()=>{
+  const c=db.clients.find(x=>x.id===ui.editing);
+  if(c&&confirm(`Удалить «${c.name}»?`)){db.clients=db.clients.filter(x=>x!==c);save();$('#dlg').close();render();toast('Удалено')}
+};
+
+$('#addBtn').onclick=()=>openDlg();
+$('#q').oninput=e=>{ui.q=e.target.value;render()};
+$('#fStatus').onchange=e=>{ui.status=e.target.value;saveUi();render()};
+$('#viewSeg').onclick=e=>{const v=e.target.dataset.v;if(v){ui.view=v;saveUi();render()}};
+$('#view').addEventListener('click',e=>{
+  const th=e.target.closest('th[data-k]');
+  if(th){const k=th.dataset.k;ui.dir=ui.sort===k?-ui.dir:1;ui.sort=k;saveUi();render();return}
+  const r=e.target.closest('[data-id]');if(r)openDlg(r.dataset.id);
+});
+// drag & drop on board
+let dragId=null;
+$('#view').addEventListener('dragstart',e=>{const c=e.target.closest('.card');if(c){dragId=c.dataset.id;e.dataTransfer.effectAllowed='move'}});
+$('#view').addEventListener('dragover',e=>{const col=e.target.closest('.col');if(col&&dragId){e.preventDefault();document.querySelectorAll('.col').forEach(x=>x.classList.toggle('drop',x===col))}});
+$('#view').addEventListener('dragleave',e=>{if(!e.relatedTarget||!e.relatedTarget.closest||!e.relatedTarget.closest('.col'))document.querySelectorAll('.col').forEach(x=>x.classList.remove('drop'))});
+$('#view').addEventListener('drop',e=>{const col=e.target.closest('.col');if(col&&dragId){e.preventDefault();const c=db.clients.find(x=>x.id===dragId);if(c&&c.status!==col.dataset.st){c.status=col.dataset.st;c.updated=new Date().toISOString();save();toast(`→ ${ST[c.status].name}`)}dragId=null;render()}});
+$('#view').addEventListener('dragend',()=>{dragId=null;document.querySelectorAll('.col').forEach(x=>x.classList.remove('drop'))});
+
+// export / import
+function download(name,text,type){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type}));a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}
+$('#expCsv').onclick=()=>{
+  const cols=[['name','Имя'],['phone','Телефон'],['contact','Email/Telegram'],['status','Статус'],['amount','Сумма'],['source','Источник'],['next','След. контакт'],['note','Примечание'],['created','Создан']];
+  const q=s=>'"'+String(s??'').replace(/"/g,'""')+'"';
+  const rows=[cols.map(c=>q(c[1])).join(';'),...db.clients.map(c=>cols.map(([k])=>q(k==='status'?ST[c.status]?.name:k==='created'?c.created?.slice(0,10):c[k])).join(';'))];
+  download(`crm-${today()}.csv`,'﻿'+rows.join('\n'),'text/csv;charset=utf-8');
+};
+$('#expJson').onclick=()=>download(`crm-backup-${today()}.json`,JSON.stringify(db,null,2),'application/json');
+$('#impJson').onclick=()=>$('#impFile').click();
+$('#impFile').onchange=async e=>{
+  const file=e.target.files[0];if(!file)return;
+  try{const d=JSON.parse(await file.text());if(!Array.isArray(d.clients))throw 0;
+    if(confirm(`Заменить текущие данные (${db.clients.length}) на копию (${d.clients.length} клиентов)?`)){db=d;save();render();toast('Восстановлено')}}
+  catch(_){alert('Не удалось прочитать файл резервной копии')}
+  e.target.value='';
+};
+
+// theme
+function applyTheme(t){if(t)document.documentElement.dataset.theme=t;else delete document.documentElement.dataset.theme}
+let theme=null;try{theme=localStorage.getItem(KEY+'-theme')}catch(e){}applyTheme(theme);
+$('#themeBtn').onclick=()=>{const dark=matchMedia('(prefers-color-scheme: dark)').matches;const cur=document.documentElement.dataset.theme||(dark?'dark':'light');theme=cur==='dark'?'light':'dark';applyTheme(theme);try{localStorage.setItem(KEY+'-theme',theme)}catch(e){}};
+
+// init selects
+const opts=STATUSES.map(s=>`<option value="${s.id}">${s.name}</option>`).join('');
+$('#stSel').innerHTML=opts;$('#fStatus').innerHTML+=opts;
+window.addEventListener('storage',e=>{if(e.key===KEY){db=load();render()}});
+render();
+</script>
+</body>
+</html>
